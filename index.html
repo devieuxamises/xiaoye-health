@@ -49,7 +49,7 @@
   .ring-center .unit{font-size:12px; color:var(--sub);}
   .legend{display:flex; justify-content:center; gap:18px; margin-top:6px; font-size:13px;}
   .legend i{display:inline-block; width:10px;height:10px;border-radius:3px; margin-right:4px;}
-  .net-line{text-align:center; margin-top:10px; font-size:14px; color:var(--text2);}
+  .net-line{text-align:center; margin-top:8px; font-size:14px; color:var(--text2);}
   .net-line b{color:var(--green-d);}
   .macro{margin-top:12px;}
   .macro-bar{margin:8px 0;}
@@ -151,6 +151,7 @@
       <span><i style="background:#f59e0b"></i>消耗<span id="burnShow"></span></span>
     </div>
     <div class="net-line">还能摄入 <b id="kcalLeft">0</b> 千卡 · 净摄入 <b id="netKcal">0</b> 千卡</div>
+    <div class="net-line" style="font-size:13px;">昨日摄入 <b id="yesterdayKcal">0</b> 千卡</div>
     <div class="macro">
       <div class="macro-bar"><div class="lb"><span>蛋白质 <b id="pVal">0g</b></span><span id="pTgt">/ 100g</span></div>
         <div class="bar"><div class="fill" id="pBar" style="background:#3b82f6;width:0%"></div></div></div>
@@ -159,6 +160,11 @@
       <div class="macro-bar"><div class="lb"><span>脂肪 <b id="fVal">0g</b></span><span id="fTgt">/ 67g</span></div>
         <div class="bar"><div class="fill" id="fBar" style="background:#ef4444;width:0%"></div></div></div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="row"><h2>⚖️ 身体状态</h2><span class="sub" id="bmiToday">BMI --</span></div>
+    <div id="bodyStatus"></div>
   </div>
 
   <div class="card">
@@ -211,7 +217,7 @@
   <h1>AI 助手</h1>
   <p class="sub">用 DeepSeek 回答你的减脂、饮食问题</p>
   <div class="chat-box" id="chatBox"></div>
-  <div class="chat-quick" id="chatQuick">
+  <div class="chat-quick">
     <span class="chip" onclick="sendQuick('帮我定制今天的减脂三餐')">定制今日三餐</span>
     <span class="chip" onclick="sendQuick('我该怎么设定每日热量目标？')">热量目标建议</span>
     <span class="chip" onclick="sendQuick('推荐几个晚上吃的低卡食物')">低卡晚餐</span>
@@ -337,6 +343,10 @@
       <span class="chip" data-fh="16" onclick="setFastPlan(16,this)">16:8</span>
       <span class="chip" data-fh="18" onclick="setFastPlan(18,this)">18:6</span>
       <span class="chip" data-fh="20" onclick="setFastPlan(20,this)">20:4</span>
+    </div>
+    <div class="row" style="margin-bottom:10px;">
+      <div class="field" style="flex:1; margin:0;"><input id="customFastHour" type="number" placeholder="自定义小时，如 14"></div>
+      <button class="btn btn-ghost" style="width:auto;" onclick="setCustomFast()">应用</button>
     </div>
     <div class="sub" id="fastInfo" style="margin-bottom:10px;">选择计划后点击开始</div>
     <div class="grid2">
@@ -590,7 +600,7 @@ function load(){
   }
   return defaultDB();
 }
-function save(){ localStorage.setItem(KEY, JSON.stringify(DB)); }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){} }
 function todayStr(d=new Date()){
   const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), dd=String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${dd}`;
@@ -667,7 +677,7 @@ function askDeepSeek(){
     const data = await resp.json();
     if(data.error) throw new Error(data.error.message || "接口错误");
     const reply = data.choices?.[0]?.message?.content || "（无回复）";
-    document.getElementById("typing").remove();
+    const typingEl = document.getElementById("typing"); if(typingEl) typingEl.remove();
     addChatMsg("ai", reply);
   }).catch(err=>{
     const t = document.getElementById("typing"); if(t) t.remove();
@@ -896,12 +906,36 @@ function renderMealDist(){
       <div class="bar"><div class="fill" style="background:${MEAL_COLORS[k]};width:${pct}%"></div></div></div>`;
   }).join("");
 }
+function renderBodyStatus(){
+  const s = DB.settings;
+  const latest = [...DB.body].sort((a,b)=>a.date.localeCompare(b.date)).pop();
+  const w = latest && latest.weight ? latest.weight : s.weight;
+  const h = s.height/100;
+  const bmi = h>0 ? w/(h*h) : 0;
+  let bmiLabel = "--";
+  if(bmi){
+    if(bmi<18.5) bmiLabel = bmi.toFixed(1)+" 偏瘦";
+    else if(bmi<24) bmiLabel = bmi.toFixed(1)+" 正常";
+    else if(bmi<28) bmiLabel = bmi.toFixed(1)+" 超重";
+    else bmiLabel = bmi.toFixed(1)+" 肥胖";
+  }
+  document.getElementById("bmiToday").textContent = "BMI " + bmiLabel;
+  let html = `<div class="net-line">当前体重 <b>${w} kg</b>`;
+  if(s.targetWeight){
+    const diff = w - s.targetWeight;
+    html += ` · 目标 ${s.targetWeight}kg`;
+    html += diff>0 ? ` · 还差 <b>${diff.toFixed(1)} kg</b>` : " · 已达成 🎉";
+  }
+  html += `</div>`;
+  document.getElementById("bodyStatus").innerHTML = html;
+}
 function renderToday(){
   const s=DB.settings;
   document.getElementById("todayDate").textContent=`${todayStr()} ${"日一二三四五六"[new Date().getDay()]}曜日`;
   document.getElementById("kcalGoal").textContent=s.goalKcal;
   document.getElementById("waterGoal").textContent=s.goalWater;
   const kcal=dayKcal(todayStr()), m=dayMacro(todayStr()), ex=todayExercise();
+  const yKcal=dayKcal(todayStr(new Date(Date.now()-86400000)));
   document.getElementById("kcalEaten").textContent=kcal;
   const circ=2*Math.PI*76, ratio=Math.min(kcal/s.goalKcal,1);
   const ring=document.getElementById("kcalRing");
@@ -910,6 +944,7 @@ function renderToday(){
   document.getElementById("burnShow").textContent=" · "+Math.round(calcBMR()*1.2+ex)+" 千卡";
   document.getElementById("kcalLeft").textContent = Math.max(0, s.goalKcal - kcal);
   document.getElementById("netKcal").textContent = Math.max(0, kcal-ex);
+  document.getElementById("yesterdayKcal").textContent = yKcal;
   document.getElementById("pVal").textContent=m.p+"g"; document.getElementById("pTgt").textContent="/ "+s.macroP+"g";
   document.getElementById("cVal").textContent=m.c+"g"; document.getElementById("cTgt").textContent="/ "+s.macroC+"g";
   document.getElementById("fVal").textContent=m.fat+"g"; document.getElementById("fTgt").textContent="/ "+s.macroF+"g";
@@ -921,6 +956,7 @@ function renderToday(){
   document.getElementById("waterBar").style.width=Math.min(w/s.goalWater*100,100)+"%";
   document.getElementById("exToday").textContent=ex;
   renderMealDist();
+  renderBodyStatus();
   renderFast();
 }
 function addWater(ml){ DB.water[todayStr()]=(DB.water[todayStr()]||0)+ml; save(); renderAll(); }
@@ -1108,6 +1144,13 @@ function checkReminder(){
 /* ================= 轻断食 ================= */
 function setFastPlan(h,el){ DB.fasting.plan=h; save(); markFastChips();
   document.getElementById("fastInfo").textContent=`${h}:${24-h} 计划 · 断食 ${h} 小时 / 进食 ${24-h} 小时`; }
+function setCustomFast(){
+  const h = +document.getElementById("customFastHour").value;
+  if(!h || h<=0 || h>=24){ alert("请输入 1～23 之间的时长"); return; }
+  DB.fasting.plan = h; save(); markFastChips();
+  document.getElementById("fastInfo").textContent=`${h}:${24-h} 计划 · 断食 ${h} 小时 / 进食 ${24-h} 小时`;
+  alert(`已设为 ${h}:${24-h}`);
+}
 function markFastChips(){
   document.querySelectorAll("[data-fh]").forEach(c=>c.classList.toggle("on",+c.dataset.fh===DB.fasting.plan));
   const h=DB.fasting.plan;
@@ -1143,4 +1186,33 @@ function importData(){
     r.onload=()=>{
       try{
         const data=normalize(JSON.parse(r.result));
-        if
+        if(confirm("导入将覆盖当前所有数据，确定？")){ DB=data; save(); renderAll(); loadAiSettings(); fillExerciseOptions(); applyTheme(); applyAccent(); alert("导入成功 ✅"); }
+      }catch(err){ alert("文件格式错误："+err.message); }
+    };
+    r.readAsText(f);
+  };
+  input.click();
+}
+function clearData(){ if(confirm("确定清空所有数据？此操作不可恢复！")){ localStorage.removeItem(KEY); DB=defaultDB(); renderAll(); loadAiSettings(); fillExerciseOptions(); applyTheme(); applyAccent(); } }
+
+/* ================= 渲染（带保护） ================= */
+function renderAll(){
+  const safe = fn => { try{ fn(); }catch(e){ console.error(e); } };
+  safe(renderToday); safe(renderDiet); safe(renderBody); safe(renderExercise); safe(renderChat);
+  if(document.getElementById("view-mine").classList.contains("active")){ safe(loadSettingsToForm); safe(loadAiSettings); }
+}
+function init(){
+  try{
+    document.getElementById("dietDate").textContent=fmtDate(viewDate);
+    fillExerciseOptions(); loadSettingsToForm(); loadAiSettings();
+    applyTheme(); applyAccent();
+    renderAll();
+    setInterval(()=>{ if(document.getElementById("view-today").classList.contains("active")) renderFast(); }, 30000);
+    setInterval(checkReminder, 60000);
+    checkReminder();
+  }catch(e){ console.error(e); }
+}
+init();
+</script>
+</body>
+</html>
