@@ -620,7 +620,6 @@ function switchTab(name){
 function changeDay(d){ viewDate.setDate(viewDate.getDate()+d); document.getElementById("dietDate").textContent=fmtDate(viewDate); renderDiet(); }
 function fmtDate(d){ return `${d.getMonth()+1}月${d.getDate()}日 ${"日一二三四五六"[d.getDay()]}曜日`; }
 
-/* ================= AI 助手 ================= */
 function loadAiSettings(){
   const a = DB.ai || {};
   document.getElementById("aiKey").value = a.apiKey || "";
@@ -667,7 +666,7 @@ function askDeepSeek(){
   box.appendChild(typing); box.scrollTop = box.scrollHeight;
   const baseUrl = (cfg.baseUrl || "https://api.deepseek.com").replace(/\/+$/,"");
   const model = cfg.model || "deepseek-chat";
-  const messages = [{ role:"system", content: SYSTEM_PROMPT }, ...DB.chat.slice(-20).map(m=>({role:m.role, content:m.content}))];
+  const messages = [{ role:"system", content: SYSTEM_PROMPT }, ...DB.chat.slice(-20).map(m=>({role: m.role==="ai" ? "assistant" : m.role, content: m.content}))];
   fetch(baseUrl + "/chat/completions", {
     method:"POST",
     headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+cfg.apiKey },
@@ -685,7 +684,6 @@ function askDeepSeek(){
   });
 }
 
-/* ================= 添加食物 ================= */
 function openFoodSheet(){ document.getElementById("modal").classList.add("show"); stepShow("meal"); renderFoodList(); }
 function closeSheet(){ document.getElementById("modal").classList.remove("show"); }
 function stepShow(s){
@@ -753,7 +751,6 @@ function addFood(food){
 }
 function delFood(id){ if(confirm("删除这条记录？")){ DB.diet=DB.diet.filter(d=>d.id!==id); save(); renderAll(); } }
 
-/* ================= 编辑记录 ================= */
 let editId=null;
 function editFood(id){
   const d=DB.diet.find(x=>x.id===id); if(!d) return;
@@ -781,7 +778,6 @@ function saveEdit(){
 function deleteEdit(){ if(confirm("删除这条记录？")){ DB.diet=DB.diet.filter(x=>x.id!==editId); save(); closeEdit(); renderAll(); } }
 function closeEdit(){ document.getElementById("editModal").classList.remove("show"); }
 
-/* ================= 食谱 ================= */
 let recipeFilter="all";
 function openRecipes(){ document.getElementById("recipeModal").classList.add("show"); renderRecipes(); }
 function closeRecipes(){ document.getElementById("recipeModal").classList.remove("show"); }
@@ -811,7 +807,6 @@ function addRecipeToDiet(i){
   save(); closeRecipes(); renderAll(); alert("已把「"+r.name+"」记入今日"+MEALS[r.meal]);
 }
 
-/* ================= 运动 ================= */
 function todayExercise(){ return DB.exercise.filter(e=>e.date===todayStr()).reduce((s,e)=>s+e.kcal,0); }
 function fillExerciseOptions(){
   const sel=document.getElementById("exType");
@@ -844,7 +839,6 @@ function renderExercise(){
     : '<div class="empty">今天还没有运动记录</div>';
 }
 
-/* ================= 身体数据 ================= */
 function updateBMI(){
   const w = +document.getElementById("bodyWeight").value || DB.settings.weight;
   const h = (+document.getElementById("bodyHeight").value || DB.settings.height)/100;
@@ -893,7 +887,6 @@ function drawChart(list){
   ctx.fillStyle=accent(); list.forEach((p,i)=>{ ctx.beginPath(); ctx.arc(x(i),y(p.weight||0),6,0,Math.PI*2); ctx.fill(); });
 }
 
-/* ================= 今日概览 ================= */
 function dayKcal(date){ return DB.diet.filter(d=>d.date===date).reduce((s,d)=>s+d.kcal,0); }
 function dayMacro(date){ return DB.diet.filter(d=>d.date===date).reduce((s,d)=>({p:s.p+d.p,c:s.c+d.c,fat:s.fat+d.fat}),{p:0,c:0,fat:0}); }
 function renderMealDist(){
@@ -961,7 +954,6 @@ function renderToday(){
 }
 function addWater(ml){ DB.water[todayStr()]=(DB.water[todayStr()]||0)+ml; save(); renderAll(); }
 
-/* ================= 饮食 ================= */
 function renderDiet(){
   document.getElementById("dietDate").textContent=fmtDate(viewDate);
   const date=todayStr(viewDate);
@@ -984,7 +976,6 @@ function renderDiet(){
   }).join("");
 }
 
-/* ================= 统计 ================= */
 let statsRange = "day";
 function openStats(){ document.getElementById("statsModal").classList.add("show"); renderStats(); }
 function closeStats(){ document.getElementById("statsModal").classList.remove("show"); }
@@ -1055,7 +1046,6 @@ function drawCalChart(days, goal){
   ctx.beginPath(); ctx.moveTo(pad,gy); ctx.lineTo(W-pad,gy); ctx.stroke(); ctx.setLineDash([]);
 }
 
-/* ================= 设置 ================= */
 function calcBMR(){ const s=DB.settings; return Math.round(10*s.weight+6.25*s.height-5*s.age+(s.gender==="male"?5:-161)); }
 function autoCalc(){
   const s=DB.settings;
@@ -1104,7 +1094,6 @@ function saveSettings(){
   save(); renderAll(); alert("已保存 ✅");
 }
 
-/* ================= 主题 ================= */
 function setTheme(v){ DB.settings.theme=v; save(); applyTheme(); }
 function setAccent(a,el){ DB.settings.accent=a; save(); applyAccent(); }
 function applyTheme(){ document.documentElement.setAttribute("data-theme", DB.settings.theme||"light"); }
@@ -1115,7 +1104,6 @@ function applyAccent(){
   document.querySelectorAll("#accentWrap .color-dot").forEach(d=>d.classList.toggle("on", d.dataset.a===(DB.settings.accent||"green")));
 }
 
-/* ================= 提醒 ================= */
 function toggleRemind(){ DB.settings.remindEnabled=document.getElementById("remindEnabled").checked; save(); }
 function saveRemindTime(){ DB.settings.remindTime=document.getElementById("remindTime").value; save(); }
 function requestNotify(){
@@ -1141,7 +1129,6 @@ function checkReminder(){
   const el=document.getElementById("inappRemind"); el.textContent="🔔 "+msg; el.style.display="block";
 }
 
-/* ================= 轻断食 ================= */
 function setFastPlan(h,el){ DB.fasting.plan=h; save(); markFastChips();
   document.getElementById("fastInfo").textContent=`${h}:${24-h} 计划 · 断食 ${h} 小时 / 进食 ${24-h} 小时`; }
 function setCustomFast(){
@@ -1173,7 +1160,6 @@ function renderFast(){
       document.getElementById("fastStatus").textContent="🍽️ 进食窗口 · 下次断食倒计时"; } }
 }
 
-/* ================= 数据 ================= */
 function exportData(){
   const blob=new Blob([JSON.stringify(DB,null,2)],{type:"application/json"});
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="xiaoye-data.json"; a.click();
@@ -1195,7 +1181,6 @@ function importData(){
 }
 function clearData(){ if(confirm("确定清空所有数据？此操作不可恢复！")){ localStorage.removeItem(KEY); DB=defaultDB(); renderAll(); loadAiSettings(); fillExerciseOptions(); applyTheme(); applyAccent(); } }
 
-/* ================= 渲染（带保护） ================= */
 function renderAll(){
   const safe = fn => { try{ fn(); }catch(e){ console.error(e); } };
   safe(renderToday); safe(renderDiet); safe(renderBody); safe(renderExercise); safe(renderChat);
